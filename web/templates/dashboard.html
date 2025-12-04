@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Fault-Tolerant Dashboard (Improved)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --primary: #667eea;
+            --secondary: #764ba2;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
+            --dark: #1f2937;
+            --light: #f9fafb;
+            --border: #e5e7eb;
+        }
+        
+        body {
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: var(--dark);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background: white;
+            padding: 25px 35px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        header h1 {
+            color: var(--primary);
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .header-right {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .connection-status {
+            padding: 8px 18px;
+            border-radius: 25px;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .connection-status::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        .connection-status.connected {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .connection-status.connected::before {
+            background: var(--success);
+        }
+        
+        .connection-status.disconnected {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .connection-status.disconnected::before {
+            background: var(--danger);
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .metrics-bar {
+            background: white;
+            padding: 20px 35px;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+            margin-bottom: 25px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 25px;
+        }
+        
+        .metric-item {
+            text-align: center;
+        }
+        
+        .metric-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 5px;
+        }
+        
+        .metric-label {
+            font-size: 13px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 25px;
+            margin-bottom: 25px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+            border: 3px solid transparent;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 25px rgba(0,0,0,0.15);
+        }
+        
+        .card.node-online {
+            border-color: var(--success);
+            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.2);
+        }
+        
+        .card.node-offline {
+            border-color: var(--danger);
+            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);
+            animation: pulseAlert 2s infinite;
+        }
+        
+        .card.node-backup {
+            border-color: var(--warning);
+            box-shadow: 0 4px 20px rgba(245, 158, 11, 0.3);
+        }
+        
+        .card.node-attacking {
+            border-color: #dc2626;
+            box-shadow: 0 4px 20px rgba(220, 38, 38, 0.4);
+            animation: pulseAttack 1s infinite;
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--border);
+        }
+        
+        .card-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-badge {
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .status-badge.online {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-badge.offline {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .status-badge.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .status-badge.attacking {
+            background: #fca5a5;
+            color: #7f1d1d;
+            animation: pulseAttack 1s infinite;
+        }
+        
+        @keyframes pulseAttack {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.05); }
+        }
+        
+        @keyframes pulseAlert {
+            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+            50% { opacity: 0.9; box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
+        }
+        
+        .metric-grid {
+            display: grid;
+            gap: 15px;
+        }
+        
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .metric-row:last-child {
+            border-bottom: none;
+        }
+        
+        .metric-key {
+            color: #6b7280;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .metric-val {
+            font-weight: 600;
+            color: var(--dark);
+            font-size: 15px;
+        }
+        
+        .metric-val.highlight {
+            color: var(--primary);
+            font-size: 20px;
+        }
+        
+        .metric-val.success {
+            color: var(--success);
+        }
+        
+        .metric-val.warning {
+            color: var(--warning);
+        }
+        
+        .metric-val.danger {
+            color: var(--danger);
+        }
+        
+        .chart-container {
+            height: 250px;
+            margin-top: 20px;
+            background: var(--light);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        
+        .data-preview {
+            background: var(--light);
+            padding: 15px;
+            border-radius: 10px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            margin-top: 15px;
+            max-height: 180px;
+            overflow-y: auto;
+            line-height: 1.6;
+        }
+        
+        .data-preview::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .data-preview::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        
+        .data-preview::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .stat-box {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            color: white;
+        }
+        
+        .stat-number {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .alert-box {
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-top: 15px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+        }
+        
+        .alert-box.info {
+            background: #dbeafe;
+            color: #1e40af;
+            border-left: 4px solid var(--info);
+        }
+        
+        .alert-box.warning {
+            background: #fef3c7;
+            color: #92400e;
+            border-left: 4px solid var(--warning);
+        }
+        
+        .alert-box.danger {
+            background: #fee2e2;
+            color: #991b1b;
+            border-left: 4px solid var(--danger);
+        }
+        
+        .wide-card {
+            grid-column: 1 / -1;
+        }
+        
+        .progress-bar {
+            height: 8px;
+            background: var(--light);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--success) 0%, var(--info) 100%);
+            transition: width 0.3s ease;
+        }
+        
+        footer {
+            text-align: center;
+            color: white;
+            margin-top: 35px;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .timestamp {
+            font-size: 11px;
+            color: #9ca3af;
+            font-style: italic;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+        
+        .badge.primary {
+            background: #e0e7ff;
+            color: #4338ca;
+        }
+        
+        .badge.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .badge.danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        /* Event Timeline Styles */
+        .event-item {
+            background: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        .event-item.online { border-left-color: var(--success); }
+        .event-item.offline { border-left-color: var(--danger); }
+        .event-item.backup { border-left-color: var(--warning); }
+        .event-item.attack { border-left-color: #dc2626; }
+        .event-item.recovery { border-left-color: var(--info); }
+        .event-item.sync { border-left-color: #8b5cf6; }
+        
+        .event-icon {
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+        
+        .event-content {
+            flex: 1;
+        }
+        
+        .event-title {
+            font-weight: 600;
+            color: var(--dark);
+            margin-bottom: 3px;
+        }
+        
+        .event-desc {
+            font-size: 13px;
+            color: #6b7280;
+        }
+        
+        .event-time {
+            font-size: 11px;
+            color: #9ca3af;
+            flex-shrink: 0;
+        }
+        
+        /* Countdown Timer Styles */
+        .countdown-timer {
+            display: inline-block;
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 18px;
+            animation: pulse 1s infinite;
+            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+        }
+        
+        /* Progress Bar for Data Sync */
+        .sync-progress {
+            margin-top: 10px;
+            background: #e5e7eb;
+            height: 24px;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .sync-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #8b5cf6 0%, #6366f1 100%);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>
+                    <span>🌐</span>
+                    <span>IoT Fault-Tolerant Dashboard</span>
+                    <span class="badge primary">IMPROVED</span>
+                </h1>
+                <p style="margin-top: 8px; color: #6b7280; font-size: 14px;">
+                    Real-time monitoring with advanced metrics & dynamic node management
+                </p>
+            </div>
+            <div class="header-right">
+                <div class="connection-status disconnected" id="wsStatus">
+                    Disconnected
+                </div>
+            </div>
+        </header>
+        
+        <!-- System Metrics Bar -->
+        <div class="metrics-bar">
+            <div class="metric-item">
+                <div class="metric-value" id="totalMessages">0</div>
+                <div class="metric-label">Total Messages</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-value" id="messagesPerSec">0</div>
+                <div class="metric-label">Messages/Second</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-value" id="avgLatency">0ms</div>
+                <div class="metric-label">Avg Latency</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-value" id="activeNodes">0</div>
+                <div class="metric-label">Active Nodes</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-value" id="systemUptime">0s</div>
+                <div class="metric-label">System Uptime</div>
+            </div>
+        </div>
+        
+        <!-- Dynamic Nodes Grid -->
+        <div class="dashboard-grid" id="nodesGrid">
+            <!-- Nodes will be dynamically added here -->
+        </div>
+        
+        <!-- System Charts -->
+        <div class="card wide-card">
+            <div class="card-header">
+                <span class="card-title">📊 System Performance Metrics</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 25px;">
+                <div class="chart-container">
+                    <canvas id="messageChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <canvas id="latencyChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Communication Flow -->
+        <div class="card wide-card">
+            <div class="card-header">
+                <span class="card-title">🔄 Communication Flow</span>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-number" id="brokerAMessages">0</div>
+                    <div class="stat-label">Broker A Messages</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="brokerBMessages">0</div>
+                    <div class="stat-label">Broker B Messages</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="totalThroughput">0</div>
+                    <div class="stat-label">Total Throughput</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="attacksHandled">0</div>
+                    <div class="stat-label">Attacks Handled</div>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>IoT Fault-Tolerant Simulation Dashboard (Improved) | WebSocket Connected | Real-time Monitoring</p>
+            <p style="margin-top: 5px; font-size: 12px;">Dynamic Nodes • Advanced Metrics • Attack Resilience</p>
+        </footer>
+    </div>
+    
+    <script src="/static/dashboard.js"></script>
+</body>
+</html>
